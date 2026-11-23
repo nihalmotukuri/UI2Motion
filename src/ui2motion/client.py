@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from ui2motion.slicer import ComponentSlice
 from ui2motion.tokens import RepoDesignContext
 
-SYSTEM_PROMPT = """You are UI2Motion-7B, a token-grounded UI visual profile and motion choreography compiler for React and TypeScript applications.
+SYSTEM_PROMPT = """You are UI2Motion-8B, a token-grounded UI visual profile and motion choreography compiler for React and TypeScript applications.
 
 Given a target TSX component, its existing imports/prop types, repository design tokens, installed motion runtime, and user intent:
 1. Preserve all exported component names, TypeScript prop interfaces, state hooks, data bindings, and event handlers.
@@ -39,7 +39,7 @@ class MotionPlan(BaseModel):
 class UI2MotionResponse(BaseModel):
     visual_plan: VisualPlan
     motion_plan: MotionPlan
-    patched_tsx: str = Field(description="Complete updated TSX file content ready to write to disk")
+    patched_tsx: str = Field(description="Updated TSX code (including any new imports) ready to splice or write")
 
 
 def build_user_prompt(
@@ -54,9 +54,11 @@ def build_user_prompt(
         "target_component": {
             "file_path": component.file_path,
             "component_name": component.component_name,
+            "is_whole_file": component.is_whole_file,
             "imports": component.imports,
             "prop_types": component.prop_types,
-            "source_tsx": component.full_file_code,
+            "helper_components": component.helper_components,
+            "source_tsx": component.component_code,
         },
         "intent": intent,
     }

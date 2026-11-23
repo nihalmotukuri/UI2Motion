@@ -12,7 +12,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from ui2motion.client import generate_upgrade
-from ui2motion.slicer import slice_tsx_file
+from ui2motion.slicer import slice_tsx_file, splice_component_back
 from ui2motion.tokens import extract_repo_context
 from ui2motion.verifier import verify_patch
 
@@ -68,6 +68,8 @@ def upgrade(
     with console.status(f"[bold yellow]Compiling visual & motion plan with {model}...[/bold yellow]"):
         result = generate_upgrade(ctx, sliced, intent=intent, mode=mode, model=model)
 
+    merged_tsx = splice_component_back(sliced, result.patched_tsx)
+
     console.print(
         Panel(
             f"[bold]Surface:[/bold] {result.visual_plan.surface_hierarchy}\n"
@@ -84,7 +86,7 @@ def upgrade(
 
     verification = verify_patch(
         original_tsx=sliced.full_file_code,
-        patched_tsx=result.patched_tsx,
+        patched_tsx=merged_tsx,
         runtime=ctx.motion_runtime,
         tsc_bin=ctx.tsc_bin,
     )
@@ -98,7 +100,7 @@ def upgrade(
     diff_lines = list(
         difflib.unified_diff(
             sliced.full_file_code.splitlines(),
-            result.patched_tsx.splitlines(),
+            merged_tsx.splitlines(),
             fromfile=f"a/{target_file.name}",
             tofile=f"b/{target_file.name}",
             lineterm="",
@@ -112,7 +114,7 @@ def upgrade(
     console.print(Syntax("\n".join(diff_lines), "diff", theme="monokai", line_numbers=False))
 
     if yes or Confirm.ask(f"Apply verified upgrade to [bold]{target_file.name}[/bold]?", default=False):
-        target_file.write_text(result.patched_tsx, encoding="utf-8")
+        target_file.write_text(merged_tsx, encoding="utf-8")
         console.print(f"[bold green]✓ Updated {target_file}[/bold green]")
 
 
