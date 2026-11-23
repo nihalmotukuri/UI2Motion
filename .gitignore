@@ -1,0 +1,21 @@
+# Python & uv
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# Model weights, LoRA adapters & GGUF exports
+outputs/
+*.gguf
+*.safetensors
+*.bin
+
+# Generated datasets (keep dataset/seeds/ tracked)
+dataset/*.jsonl
+
+# Environment & IDE
+.env
+.DS_Store
+.vscode/
