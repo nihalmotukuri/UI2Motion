@@ -74,7 +74,7 @@ def generate_upgrade(
     component: ComponentSlice,
     intent: str,
     mode: Literal["full_upgrade", "style_only", "motion_only"] = "full_upgrade",
-    model: str = "ui2motion-8b:latest",
+    model: str = "ui2motion-7b:latest",
     ollama_url: str = "http://localhost:11434",
     num_ctx: int = 4096,
 ) -> UI2MotionResponse:

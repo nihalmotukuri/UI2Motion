@@ -1,6 +1,6 @@
 # UI2Motion
 
-Token-grounded UI visual profile & motion choreography compiler powered by **UI2Motion-8B** (`Qwen/Qwen3-8B` 4-bit QLoRA).
+Token-grounded UI visual profile & motion choreography compiler powered by **UI2Motion-8B** (`Qwen/Qwen2.5-Coder-7B-Instruct` 4-bit QLoRA).
 
 ## Features
 - **Automatic Repo Grounding:** Extracts CSS custom properties (`:root` / `@theme`), Tailwind config tokens, and installed motion runtimes (`motion/react`, `framer-motion`, `gsap`, or `css-only`).

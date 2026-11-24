@@ -1,5 +1,5 @@
 """
-Fine-tune Qwen/Qwen3-8B into UI2Motion-8B using 4-bit QLoRA (Unsloth + TRL)
+Fine-tune Qwen/Qwen2.5-Coder-7B-Instruct into UI2Motion-8B using 4-bit QLoRA (Unsloth + TRL)
 and export directly to Q4_K_M GGUF + Ollama Modelfile.
 
 Run on GPU (Colab / Kaggle / RunPod / local CUDA):
@@ -16,10 +16,10 @@ from datasets import load_dataset
 from trl import SFTConfig, SFTTrainer
 from unsloth import FastLanguageModel, is_bfloat16_supported
 
-BASE_MODEL = "Qwen/Qwen3-8B"
+BASE_MODEL = "Qwen/Qwen2.5-Coder-7B-Instruct"
 DATASET_PATH = "dataset/train.jsonl"
-OUTPUT_DIR = "outputs/ui2motion-8b-lora"
-GGUF_EXPORT_DIR = "outputs/ui2motion-8b-gguf"
+OUTPUT_DIR = "outputs/ui2motion-7b-lora"
+GGUF_EXPORT_DIR = "outputs/ui2motion-7b-gguf"
 MAX_SEQ_LENGTH = 4096
 
 
@@ -110,7 +110,7 @@ def main() -> None:
         'PARAMETER top_p 0.9\n',
         encoding="utf-8",
     )
-    print(f"Export complete. Load into Ollama with:\n  ollama create ui2motion-8b:latest -f {modelfile_path}")
+    print(f"Export complete. Load into Ollama with:\n  ollama create ui2motion-7b:latest -f {modelfile_path}")
 
 
 if __name__ == "__main__":

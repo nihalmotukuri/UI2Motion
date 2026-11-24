@@ -50,7 +50,7 @@ def upgrade(
     mode: Literal["full_upgrade", "style_only", "motion_only"] = typer.Option(
         "full_upgrade", "--mode", "-m", help="Upgrade scope"
     ),
-    model: str = typer.Option("ui2motion-8b:latest", "--model", help="Ollama model tag"),
+    model: str = typer.Option("ui2motion-7b:latest", "--model", help="Ollama model tag"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Apply verified patch without prompting"),
 ) -> None:
     """Upgrade a React/TSX component's visual hierarchy and motion choreography."""
