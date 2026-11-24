@@ -20,7 +20,7 @@ BASE_MODEL = "Qwen/Qwen2.5-Coder-7B-Instruct"
 DATASET_PATH = "dataset/train.jsonl"
 OUTPUT_DIR = "outputs/ui2motion-7b-lora"
 GGUF_EXPORT_DIR = "outputs/ui2motion-7b-gguf"
-MAX_SEQ_LENGTH = 4096
+MAX_SEQ_LENGTH = 8192
 
 
 def main() -> None:
@@ -53,12 +53,10 @@ def main() -> None:
     raw_dataset = load_dataset("json", data_files=DATASET_PATH, split="train")
 
     def format_chat(example: dict) -> dict:
-        # Disable Qwen3 thinking tags during SFT so responses emit strict JSON immediately
         text = tokenizer.apply_chat_template(
             example["messages"],
             tokenize=False,
             add_generation_prompt=False,
-            enable_thinking=False,
         )
         return {"text": text}
 
@@ -102,10 +100,12 @@ def main() -> None:
         quantization_method="q4_k_m",
     )
 
+    gguf_files = sorted(Path(GGUF_EXPORT_DIR).glob("*.gguf"))
+    gguf_name = gguf_files[0].name if gguf_files else "unsloth.Q4_K_M.gguf"
     modelfile_path = Path(GGUF_EXPORT_DIR) / "Modelfile"
     modelfile_path.write_text(
-        'FROM ./unsloth.Q4_K_M.gguf\n'
-        'PARAMETER num_ctx 4096\n'
+        f'FROM ./{gguf_name}\n'
+        'PARAMETER num_ctx 8192\n'
         'PARAMETER temperature 0.2\n'
         'PARAMETER top_p 0.9\n',
         encoding="utf-8",
