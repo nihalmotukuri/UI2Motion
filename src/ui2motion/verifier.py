@@ -90,18 +90,20 @@ def check_contract_preservation(original_tsx: str, patched_tsx: str) -> list[str
     return errors
 
 
-def check_tsc_syntax(patched_tsx: str, tsc_bin: str | None = None) -> list[str]:
+def check_tsc_syntax(patched_tsx: str, tsc_bin: str | None = None, project_root: str | None = None) -> list[str]:
     """Run TypeScript compiler check on standalone TSX if tsc is available."""
     if not tsc_bin:
         return []
 
-    with tempfile.TemporaryDirectory() as tmpdir:
+    tmp_dir_ctx = tempfile.TemporaryDirectory(dir=project_root) if project_root else tempfile.TemporaryDirectory()
+    with tmp_dir_ctx as tmpdir:
         tmp_file = Path(tmpdir) / "Component.tsx"
         tmp_file.write_text(patched_tsx, encoding="utf-8")
         proc = subprocess.run(
-            [tsc_bin, "--noEmit", "--jsx", "react-jsx", "--target", "ES2022", str(tmp_file)],
+            [tsc_bin, "--noEmit", "--jsx", "react-jsx", "--target", "ES2022", "--moduleResolution", "bundler", str(tmp_file)],
             capture_output=True,
             text=True,
+            cwd=project_root or None,
             timeout=15,
         )
         if proc.returncode != 0:
@@ -119,9 +121,10 @@ def verify_patch(
     patched_tsx: str,
     runtime: str,
     tsc_bin: str | None = None,
+    project_root: str | None = None,
 ) -> VerificationResult:
     errors: list[str] = []
     errors.extend(check_contract_preservation(original_tsx, patched_tsx))
     errors.extend(check_motion_rules(patched_tsx, runtime))
-    errors.extend(check_tsc_syntax(patched_tsx, tsc_bin=tsc_bin))
+    errors.extend(check_tsc_syntax(patched_tsx, tsc_bin=tsc_bin, project_root=project_root))
     return VerificationResult(passed=len(errors) == 0, errors=errors)

@@ -91,11 +91,11 @@ def generate_upgrade(
             "format": UI2MotionResponse.model_json_schema(),
             "stream": False,
             "options": {
-                "num_ctx": num_ctx,
+                "num_ctx": 8192,
                 "temperature": 0.2,
             },
         },
-        timeout=180.0,
+        timeout=httpx.Timeout(300.0, connect=10.0),
     )
     response.raise_for_status()
     raw_content = response.json()["message"]["content"]

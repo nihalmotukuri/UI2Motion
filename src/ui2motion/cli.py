@@ -89,6 +89,7 @@ def upgrade(
         patched_tsx=merged_tsx,
         runtime=ctx.motion_runtime,
         tsc_bin=ctx.tsc_bin,
+        project_root=ctx.frontend_root,
     )
 
     if not verification.passed:
