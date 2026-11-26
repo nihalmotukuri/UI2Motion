@@ -19,3 +19,9 @@ dataset/*.jsonl
 .env
 .DS_Store
 .vscode/
+
+.venv-train/
+outputs/
+unsloth_compiled_cache/
+unsloth_compiled_cache/
+unsloth_compiled_cache/

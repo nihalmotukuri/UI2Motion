@@ -103,7 +103,15 @@ def slice_tsx_file(file_path: str | Path, component_name: str | None = None) -> 
             is_whole_file=True,
         )
 
-    selected_name, selected_node = components[0]
+    # Prefer exported component matching file stem, then exported component, then largest component
+    selected_name, selected_node = max(
+        components,
+        key=lambda item: (
+            item[0].lower() == path.stem.lower(),
+            "export " in _node_text(item[1], source_bytes)[:30],
+            item[1].end_byte - item[1].start_byte,
+        ),
+    )
     if component_name:
         for name, node in components:
             if name == component_name:
@@ -125,18 +133,81 @@ def slice_tsx_file(file_path: str | Path, component_name: str | None = None) -> 
         if name != selected_name and name in jsx_refs
     ]
 
+    whole_file = len(source_code.splitlines()) <= 650
     return ComponentSlice(
         file_path=str(path),
         component_name=selected_name,
-        start_line=selected_node.start_point[0] + 1,
-        end_line=selected_node.end_point[0] + 1,
+        start_line=1 if whole_file else selected_node.start_point[0] + 1,
+        end_line=len(source_code.splitlines()) if whole_file else selected_node.end_point[0] + 1,
         imports=imports,
         prop_types=prop_types,
-        helper_components=helper_components,
-        component_code=selected_code,
+        helper_components=[] if whole_file else helper_components,
+        component_code=source_code if whole_file else selected_code,
         full_file_code=source_code,
-        is_whole_file=(len(components) == 1 and len(source_code.splitlines()) <= 160),
+        is_whole_file=whole_file,
     )
+
+
+def _extract_imported_symbols_by_source(import_stmts: list[str]) -> dict[str, set[str]]:
+    """Map module specifier -> set of imported local/named identifiers."""
+    by_source: dict[str, set[str]] = {}
+    for stmt in import_stmts:
+        src_match = re.search(r"""from\s+['"]([^'"]+)['"]""", stmt)
+        if not src_match:
+            continue
+        mod = src_match.group(1)
+        syms = by_source.setdefault(mod, set())
+        named = re.search(r"\{([^}]*)\}", stmt)
+        if named:
+            for item in named.group(1).split(","):
+                tok = item.strip()
+                if not tok:
+                    continue
+                tok = re.sub(r"^type\s+", "", tok)
+                local = tok.split(" as ")[-1].strip()
+                if local:
+                    syms.add(local)
+        default_match = re.match(r"^import\s+(?:type\s+)?([A-Za-z0-9_$]+)\s*(?:,|from)", stmt.strip())
+        if default_match:
+            syms.add(default_match.group(1))
+    return by_source
+
+
+def _filter_duplicate_imports(existing_imports: list[str], candidate_imports: list[str]) -> list[str]:
+    """Drop candidate imports whose symbols are already imported from the same module."""
+    existing_map = _extract_imported_symbols_by_source(existing_imports)
+    filtered: list[str] = []
+    for stmt in candidate_imports:
+        if stmt in existing_imports:
+            continue
+        src_match = re.search(r"""from\s+['"]([^'"]+)['"]""", stmt)
+        if not src_match:
+            filtered.append(stmt)
+            continue
+        mod = src_match.group(1)
+        already = existing_map.get(mod, set())
+        cand_map = _extract_imported_symbols_by_source([stmt]).get(mod, set())
+        if cand_map and cand_map.issubset(already):
+            continue
+        # Strip individual duplicate named specifiers if partially overlapping
+        named = re.search(r"\{([^}]*)\}", stmt)
+        if named and already:
+            kept_items = []
+            for item in named.group(1).split(","):
+                tok = item.strip()
+                if not tok:
+                    continue
+                clean = re.sub(r"^type\s+", "", tok).split(" as ")[-1].strip()
+                if clean not in already:
+                    kept_items.append(tok)
+                    already.add(clean)
+            if not kept_items:
+                continue
+            stmt = re.sub(r"\{[^}]*\}", "{ " + ", ".join(kept_items) + " }", stmt, count=1)
+        else:
+            already.update(cand_map)
+        filtered.append(stmt)
+    return filtered
 
 
 def splice_component_back(sliced: ComponentSlice, patched_tsx: str) -> str:
@@ -151,13 +222,14 @@ def splice_component_back(sliced: ComponentSlice, patched_tsx: str) -> str:
     new_imports: list[str] = []
     target_node: Node | None = None
 
+    raw_candidate_imports: list[str] = []
     for child in tree.root_node.children:
         if child.type == "import_statement":
-            imp_text = _node_text(child, source_bytes)
-            if imp_text not in sliced.imports:
-                new_imports.append(imp_text)
+            raw_candidate_imports.append(_node_text(child, source_bytes))
         elif _extract_component_name(child, source_bytes) == sliced.component_name:
             target_node = child
+
+    new_imports = _filter_duplicate_imports(sliced.imports, raw_candidate_imports)
 
     if target_node is None:
         return patched_tsx

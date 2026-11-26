@@ -65,10 +65,31 @@ def upgrade(
         f"| [bold green]Runtime:[/bold green] {ctx.motion_runtime} | [bold magenta]Mode:[/bold magenta] {mode}"
     )
 
-    with console.status(f"[bold yellow]Compiling visual & motion plan with {model}...[/bold yellow]"):
-        result = generate_upgrade(ctx, sliced, intent=intent, mode=mode, model=model)
+    active_intent = intent
+    for attempt in range(2):
+        label = (
+            f"Compiling visual & motion plan with {model}..."
+            if attempt == 0
+            else f"Refining patch to satisfy verification checks ({model})..."
+        )
+        with console.status(f"[bold yellow]{label}[/bold yellow]"):
+            result = generate_upgrade(ctx, sliced, intent=active_intent, mode=mode, model=model)
 
-    merged_tsx = splice_component_back(sliced, result.patched_tsx)
+        merged_tsx = splice_component_back(sliced, result.patched_tsx)
+        verification = verify_patch(
+            original_tsx=sliced.full_file_code,
+            patched_tsx=merged_tsx,
+            runtime=ctx.motion_runtime,
+            tsc_bin=ctx.tsc_bin,
+            project_root=ctx.frontend_root,
+        )
+        if verification.passed:
+            break
+        active_intent = (
+            intent
+            + "\n\nFix these verification errors from your previous attempt:\n"
+            + "\n".join(f"- {err}" for err in verification.errors)
+        )
 
     console.print(
         Panel(
@@ -82,14 +103,6 @@ def upgrade(
             title="Choreography & Visual Plan",
             border_style="bright_blue",
         )
-    )
-
-    verification = verify_patch(
-        original_tsx=sliced.full_file_code,
-        patched_tsx=merged_tsx,
-        runtime=ctx.motion_runtime,
-        tsc_bin=ctx.tsc_bin,
-        project_root=ctx.frontend_root,
     )
 
     if not verification.passed:

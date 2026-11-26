@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from unsloth import FastLanguageModel, is_bfloat16_supported
 from datasets import load_dataset
 from trl import SFTConfig, SFTTrainer
-from unsloth import FastLanguageModel, is_bfloat16_supported
 
 BASE_MODEL = "Qwen/Qwen2.5-Coder-7B-Instruct"
 DATASET_PATH = "dataset/train.jsonl"
@@ -64,13 +64,13 @@ def main() -> None:
 
     trainer = SFTTrainer(
         model=model,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         train_dataset=dataset,
-        dataset_text_field="text",
-        max_seq_length=MAX_SEQ_LENGTH,
-        dataset_num_proc=2,
-        packing=False,
         args=SFTConfig(
+            dataset_text_field="text",
+            max_length=MAX_SEQ_LENGTH,
+            dataset_num_proc=2,
+            packing=False,
             per_device_train_batch_size=2,
             gradient_accumulation_steps=4,
             warmup_steps=15,

@@ -9,16 +9,21 @@ from pydantic import BaseModel, Field
 from ui2motion.slicer import ComponentSlice
 from ui2motion.tokens import RepoDesignContext
 
-SYSTEM_PROMPT = """You are UI2Motion-8B, a token-grounded UI visual profile and motion choreography compiler for React and TypeScript applications.
+SYSTEM_PROMPT = """You are UI2Motion-7B, a token-grounded UI visual profile and motion choreography compiler for React and TypeScript applications.
 
 Given a target TSX component, its existing imports/prop types, repository design tokens, installed motion runtime, and user intent:
 1. Preserve all exported component names, TypeScript prop interfaces, state hooks, data bindings, and event handlers.
 2. Ground all styling in the repository's existing CSS variables, Tailwind tokens, and aesthetic profile.
 3. Use ONLY the detected motion runtime ("framer-motion", "gsap", or "css-only"). Note: if "motion" is in installed_packages instead of "framer-motion", import from "motion/react".
-4. Animate ONLY GPU-composited properties (transform: x, y, scale, rotate; opacity). Never animate width, height, top, left, margin, or padding.
-5. For GSAP, wrap animations in useGSAP() or gsap.context() with ctx.revert() cleanup.
-6. Always include a reduced-motion accessibility fallback (useReducedMotion, gsap.matchMedia, or prefers-reduced-motion).
-7. Return strictly valid JSON matching the required schema with complete, compilable TSX in `patched_tsx`."""
+4. Choreograph multi-layered, purposeful motion across the full component hierarchy—never settle for a single trivial fade-in when upgrading a section or page:
+   - Hero & above-the-fold focal elements: orchestrate staggered parent/child `variants` (`staggerChildren` / `delayChildren`) combining directional `y`/`x` translation, subtle `scale` settle (`0.96 -> 1`), and opacity.
+   - Below-the-fold sections, cards, and feature lists: add scroll-triggered `whileInView` reveals (`viewport={{ once: true, amount: 0.2 }}`) with staggered sibling entrances so content reveals progressively as the user scrolls.
+   - Interactive cards, buttons, and pills: add tactile spring `whileHover` (e.g. `y: -3, scale: 1.015`) and `whileTap` (`scale: 0.98`) micro-interactions, and wrap conditional UI toggles/modals in `AnimatePresence`.
+   - When the user asks for advanced or expressive motion, also leverage scroll-linked parallax/progress (`useScroll` + `useTransform`) or shared-element transitions (`layoutId`) where structurally appropriate.
+5. Animate ONLY GPU-composited properties (transform: x, y, scale, rotate; opacity). Never animate width, height, top, left, margin, or padding.
+6. For GSAP, wrap animations in useGSAP() or gsap.context() with ctx.revert() cleanup and ScrollTrigger for viewport reveals.
+7. Always include a reduced-motion accessibility fallback (useReducedMotion, gsap.matchMedia, or prefers-reduced-motion) that bypasses non-essential motion cleanly.
+8. Return strictly valid JSON matching the required schema with complete, compilable TSX in `patched_tsx`."""
 
 
 class VisualPlan(BaseModel):
@@ -92,7 +97,8 @@ def generate_upgrade(
             "stream": False,
             "options": {
                 "num_ctx": 8192,
-                "temperature": 0.2,
+                "num_predict": 8192,
+                "temperature": 0.45,
             },
         },
         timeout=httpx.Timeout(300.0, connect=10.0),
