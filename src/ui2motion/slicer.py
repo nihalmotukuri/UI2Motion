@@ -133,7 +133,7 @@ def slice_tsx_file(file_path: str | Path, component_name: str | None = None) -> 
         if name != selected_name and name in jsx_refs
     ]
 
-    whole_file = len(source_code.splitlines()) <= 650
+    whole_file = len(source_code.splitlines()) <= 180
     return ComponentSlice(
         file_path=str(path),
         component_name=selected_name,
@@ -210,8 +210,42 @@ def _filter_duplicate_imports(existing_imports: list[str], candidate_imports: li
     return filtered
 
 
+def _sanitize_motion_on_router_links(code: str) -> str:
+    """Strip Framer Motion gesture/animation props if placed directly on react-router <Link>."""
+    motion_props = r"(?:whileHover|whileTap|whileInView|initial|animate|exit|variants|viewport|transition)"
+    def _clean_link_open_tag(match: re.Match[str]) -> str:
+        tag = match.group(0)
+        # Remove motion_prop={...} attributes from <Link ...>
+        cleaned = re.sub(
+            rf"\s+{motion_props}=\{{(?:[^{{}}]|\{{(?:[^{{}}]|\{{[^{{}}]*\}})*\}})*\}}",
+            "",
+            tag,
+        )
+        return cleaned
+
+    return re.sub(r"<Link\b[^>]*>", _clean_link_open_tag, code, flags=re.DOTALL)
+
+
+def _sanitize_motion_on_router_links(code: str) -> str:
+    """Strip Framer Motion gesture/animation props if placed directly on react-router <Link>."""
+    motion_props = r"(?:whileHover|whileTap|whileInView|initial|animate|exit|variants|viewport|transition)"
+    def _clean_link_open_tag(match: re.Match[str]) -> str:
+        tag = match.group(0)
+        # Remove motion_prop={...} attributes from <Link ...>
+        cleaned = re.sub(
+            rf"\s+{motion_props}=\{{(?:[^{{}}]|\{{(?:[^{{}}]|\{{[^{{}}]*\}})*\}})*\}}",
+            "",
+            tag,
+        )
+        return cleaned
+
+    return re.sub(r"<Link\b[^>]*>", _clean_link_open_tag, code, flags=re.DOTALL)
+
+
 def splice_component_back(sliced: ComponentSlice, patched_tsx: str) -> str:
     """Merge patched component code and any newly added imports back into the full file."""
+    patched_tsx = _sanitize_motion_on_router_links(patched_tsx)
+    patched_tsx = _sanitize_motion_on_router_links(patched_tsx)
     if sliced.is_whole_file:
         return patched_tsx
 

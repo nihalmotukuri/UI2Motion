@@ -3,8 +3,14 @@ from __future__ import annotations
 import re
 import subprocess
 import tempfile
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
+
+import tree_sitter_typescript as tstypescript
+from tree_sitter import Language, Node, Parser
+
+TSX_LANGUAGE = Language(tstypescript.language_tsx())
 
 FORBIDDEN_ANIMATED_PROPS = (
     "width",
@@ -90,6 +96,47 @@ def check_contract_preservation(original_tsx: str, patched_tsx: str) -> list[str
     return errors
 
 
+def _collect_jsx_texts(tsx_code: str) -> Counter[str]:
+    """Extract normalized non-empty JSX text literals using Tree-sitter."""
+    source_bytes = tsx_code.encode("utf-8")
+    tree = Parser(TSX_LANGUAGE).parse(source_bytes)
+    counts: Counter[str] = Counter()
+
+    def _walk(node: Node) -> None:
+        if node.type == "jsx_text":
+            txt = " ".join(
+                source_bytes[node.start_byte : node.end_byte]
+                .decode("utf-8", errors="replace")
+                .split()
+            )
+            if len(txt) >= 3:
+                counts[txt] += 1
+        for child in node.children:
+            _walk(child)
+
+    _walk(tree.root_node)
+    return counts
+
+
+def check_jsx_structure_preservation(original_tsx: str, patched_tsx: str) -> list[str]:
+    """Ensure JSX text nodes were neither dropped nor duplicated during upgrade."""
+    errors: list[str] = []
+    orig_texts = _collect_jsx_texts(original_tsx)
+    patched_texts = _collect_jsx_texts(patched_tsx)
+
+    dropped = [txt for txt, cnt in orig_texts.items() if patched_texts[txt] < cnt]
+    duplicated = [txt for txt, cnt in patched_texts.items() if cnt > orig_texts[txt]]
+
+    if dropped:
+        sample = ", ".join(f"'{t}'" for t in dropped[:4])
+        errors.append(f"JSX text/elements were removed during upgrade: {sample}. Preserve all existing copy.")
+    if duplicated:
+        sample = ", ".join(f"'{t}'" for t in duplicated[:4])
+        errors.append(f"JSX text/subtree was duplicated during upgrade: {sample}. Do not duplicate existing sections.")
+
+    return errors
+
+
 def check_tsc_syntax(patched_tsx: str, tsc_bin: str | None = None, project_root: str | None = None) -> list[str]:
     """Run TypeScript compiler check on standalone TSX if tsc is available."""
     if not tsc_bin:
@@ -125,6 +172,7 @@ def verify_patch(
 ) -> VerificationResult:
     errors: list[str] = []
     errors.extend(check_contract_preservation(original_tsx, patched_tsx))
+    errors.extend(check_jsx_structure_preservation(original_tsx, patched_tsx))
     errors.extend(check_motion_rules(patched_tsx, runtime))
     errors.extend(check_tsc_syntax(patched_tsx, tsc_bin=tsc_bin, project_root=project_root))
     return VerificationResult(passed=len(errors) == 0, errors=errors)
